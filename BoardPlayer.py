@@ -70,23 +70,40 @@ class ButtonPlayer(Button):
 			self.sounds = self.sounds + [f for f in listdir(directory) if isfile(join(directory, f)) and f.endswith(".mp3")]
 			
 	def playing(self):
-		return self.player and self.player.get_state() == libvlc_Playing
+		return self.player and self.player.get_state() in [vlc.State.Playing, vlc.State.Opening]
 
 	def getNewSound(self):
 		return random.choice(self.sounds)
-			
+	
+	def setVolume(self, v):
+		if verbose:
+			print("SETVOLUME (" + str(v) + ") on button " + str(self.alias))
+		if self.playing():
+			self.player.audio_set_volume(v)
+	
 	def stop(self):
 		if verbose:
 			print("STOP on button " + str(self.alias))
 		if self.player:
 			self.player.stop()
 			self.player = None
+			self.board.adjustVolumes()
 		pass
+		
+	def soundFinished(self, data, media):
+		if verbose:
+			print("ENDOFSOUND on button " + str(self.alias))
+		self.player = None
+		self.board.adjustVolumes()
+		
+	
 	def playNewSound(self):
 		if verbose:
 			print("PLAY on button " + str(self.alias))
 		self.player = vlc.MediaPlayer(self.getNewSound())
+		self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.soundFinished, 1)
 		self.player.play()
+		self.board.adjustVolumes()
 
 	def shortPress(self):
 		self.playNewSound()
@@ -124,7 +141,21 @@ class Board:
 			button.stop()
 	
 	def nbPlayingButtons(self):
-		return len([b for b in buttons if b.playing()])
+		return len([b for b in self.buttons if b.playing()])
+
+	def volumeLevelNButtons(self, nbButtons):
+		if nbButtons <= 0:
+			return 100
+		else:
+			return int(round(100. / nbButtons))
+
+
+	def adjustVolumes(self):
+		nb = self.nbPlayingButtons()
+		volume = self.volumeLevelNButtons(nb)
+		for b in self.buttons:
+			if b.playing():
+				b.setVolume(volume)
 
 	def run(self):
 		import asyncio
