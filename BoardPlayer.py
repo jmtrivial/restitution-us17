@@ -4,6 +4,7 @@ from thirdparty import vlc
 import random
 from os import listdir
 from os.path import isfile, join, isdir
+import asyncio
 
 
 
@@ -37,16 +38,25 @@ class Button:
 
 
 	def rising(self):
-		print("Rising on channel" + str(self.channel))
+		if verbose:
+			print("Rising on channel"  + str(self.channel))
 		timestamp2 = currentTimestamp()
 		if timestamp2 - self.timestamp < self.durationShortPress:
 			self.shortPress()
 		else:
 			self.longPress()
 
+	def afterShortPress(self, initialTimestamp):
+		if self.state == True and self.timestamp == initialTimestamp:
+			if verbose:
+				print("LONG PRESS detected on channel" + str(self.channel))
+			self.longPress()
+
 	def falling(self):
 		self.timestamp = currentTimestamp()
-		print("\nFalling on channel" + str(self.channel))
+		self.board.registerCallback(self.durationShortPress, self.afterShortPress, self.timestamp)
+		if verbose:
+			print("\nFalling on channel " + str(self.channel))
 
 
 class ButtonPlayer(Button):
@@ -62,12 +72,14 @@ class ButtonPlayer(Button):
 		self.sounds = []
 		for directory in directories:
 			self.loadSoundListFromDir(directory)
+		if verbose:
+			print("LOADING " + str(len(self.sounds)) + " in channel " + self.alias)
 		if len(self.sounds) == 0:
 			self.sounds.append("data/default.mp3")
 
 	def loadSoundListFromDir(self, directory):
 		if isdir(directory):
-			self.sounds = self.sounds + [f for f in listdir(directory) if isfile(join(directory, f)) and f.endswith(".mp3")]
+			self.sounds = self.sounds + [ ff for ff in [directory + "/" + f for f in listdir(directory)] if isfile(ff) and ff.endswith(".mp3")]
 			
 	def playing(self):
 		return self.player and self.player.get_state() in [vlc.State.Playing, vlc.State.Opening]
@@ -77,29 +89,33 @@ class ButtonPlayer(Button):
 	
 	def setVolume(self, v):
 		if verbose:
-			print("SETVOLUME (" + str(v) + ") on button " + str(self.alias))
+			print("SETVOLUME (" + str(v) + ") on channel " + str(self.alias))
 		if self.playing():
 			self.player.audio_set_volume(v)
 	
 	def stop(self):
-		if verbose:
-			print("STOP on button " + str(self.alias))
 		if self.player:
+			if verbose:
+				print("STOP on channel " + str(self.alias))
 			self.player.stop()
+			self.player.release()
 			self.player = None
 			self.board.adjustVolumes()
 		pass
 		
 	def soundFinished(self, data, media):
 		if verbose:
-			print("ENDOFSOUND on button " + str(self.alias))
+			print("ENDOFSOUND on channel " + str(self.alias))
 		self.player = None
 		self.board.adjustVolumes()
 		
 	
 	def playNewSound(self):
 		if verbose:
-			print("PLAY on button " + str(self.alias))
+			print("PLAY on channel " + str(self.alias))
+		if self.player:
+			self.player.stop()
+			self.player.release()
 		self.player = vlc.MediaPlayer(self.getNewSound())
 		self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.soundFinished, 1)
 		self.player.play()
@@ -111,8 +127,8 @@ class ButtonPlayer(Button):
 	def longPress(self):
 		self.stop()
 	
-		
-		
+
+
 class ButtonMainControl(Button):
 	def __init__(self, channel, board):
 		Button.__init__(self, channel, board)
@@ -128,6 +144,7 @@ class ButtonMainControl(Button):
 class Board:
 	def __init__(self):
 		self.buttons = []
+		self.autoVolumes = False
 		GPIO.setmode(GPIO.BOARD)
 		
 	def addButtonMainControl(self, channel):
@@ -149,17 +166,23 @@ class Board:
 		else:
 			return int(round(100. / nbButtons))
 
+	def registerCallback(self, delay, function, timestamp):
+		self.loop.call_soon_threadsafe(self.loop.call_later, delay, function, timestamp)
 
 	def adjustVolumes(self):
-		nb = self.nbPlayingButtons()
-		volume = self.volumeLevelNButtons(nb)
-		for b in self.buttons:
-			if b.playing():
-				b.setVolume(volume)
+		# by default, pulseaudio automatically adjust multiple volumes
+		if self.autoVolumes:
+			nb = self.nbPlayingButtons()
+			volume = self.volumeLevelNButtons(nb)
+			for b in self.buttons:
+				if b.playing():
+					b.setVolume(volume)
 
 	def run(self):
-		import asyncio
 		
-		loop = asyncio.get_event_loop()
-		loop.run_forever()
-		loop.close()
+		self.loop = asyncio.get_event_loop()
+		self.loop.set_debug(True)
+		self.loop.run_forever()
+		self.loop.close()
+		GPIO.cleanup()
+
