@@ -69,7 +69,9 @@ class ButtonPlayer(Button):
 		if isdir(directory):
 			self.sounds = self.sounds + [f for f in listdir(directory) if isfile(join(directory, f)) and f.endswith(".mp3")]
 			
-			
+	def playing(self):
+		return self.player and self.player.get_state() == libvlc_Playing
+
 	def getNewSound(self):
 		return random.choice(self.sounds)
 			
@@ -121,6 +123,8 @@ class Board:
 		for button in self.buttons:
 			button.stop()
 	
+	def nbPlayingButtons(self):
+		return len([b for b in buttons if b.playing()])
 
 	def run(self):
 		import asyncio
