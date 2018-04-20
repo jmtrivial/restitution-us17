@@ -50,33 +50,39 @@ class Button:
 
 
 class ButtonPlayer(Button):
-	def __init__(self, channel, directory, board):
+	def __init__(self, channel, alias, directories, board):
 		Button.__init__(self, channel, board)
 		self.player = None
-		self.loadSoundListFromDir(directory)
+		self.alias = alias
+		
+		self.loadSoundListFromDirs(directories)
+		
+	def loadSoundListFromDirs(self, directories):
+		# load sounds
+		self.sounds = []
+		for directory in directories:
+			self.loadSoundListFromDir(directory)
+		if len(self.sounds) == 0:
+			self.sounds.append("data/default.mp3")
 
 	def loadSoundListFromDir(self, directory):
 		if isdir(directory):
-			self.sounds = [f for f in listdir(directory) if isfile(join(directory, f)) and f.endswith(".mp3")]
-		else:
-			self.sounds = []
-		if len(self.sounds) == 0:
-			self.sounds.append("data/default.mp3")
-		pass
+			self.sounds = self.sounds + [f for f in listdir(directory) if isfile(join(directory, f)) and f.endswith(".mp3")]
+			
 			
 	def getNewSound(self):
 		return random.choice(self.sounds)
 			
 	def stop(self):
 		if verbose:
-			print("STOP on button " + str(self.channel))
+			print("STOP on button " + str(self.alias))
 		if self.player:
 			self.player.stop()
 			self.player = None
 		pass
 	def playNewSound(self):
 		if verbose:
-			print("PLAY on button " + str(self.channel))
+			print("PLAY on button " + str(self.alias))
 		self.player = vlc.MediaPlayer(self.getNewSound())
 		self.player.play()
 
@@ -108,8 +114,8 @@ class Board:
 	def addButtonMainControl(self, channel):
 		self.mainControl = ButtonMainControl(channel, self)
 		
-	def addButton(self, channel, directory):
-		self.buttons.append(ButtonPlayer(channel, directory, self))
+	def addButton(self, channel, alias, directories):
+		self.buttons.append(ButtonPlayer(channel, alias, directories, self))
 		
 	def stopAllSounds(self):
 		for button in self.buttons:
