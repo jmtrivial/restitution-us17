@@ -43,8 +43,6 @@ class Button:
 		timestamp2 = currentTimestamp()
 		if timestamp2 - self.timestamp < self.durationShortPress:
 			self.shortPress()
-		else:
-			self.longPress()
 
 	def afterShortPress(self, initialTimestamp):
 		if self.state == True and self.timestamp == initialTimestamp:
@@ -60,22 +58,24 @@ class Button:
 
 
 class ButtonPlayer(Button):
-	def __init__(self, channel, alias, directories, board):
+	debugSound = "data/default.mp3"
+	
+	def __init__(self, channel, alias, directories, directory, board):
 		Button.__init__(self, channel, board)
 		self.player = None
 		self.alias = alias
 		
-		self.loadSoundListFromDirs(directories)
+		self.loadSoundListFromDirs(directories, directory)
 		
-	def loadSoundListFromDirs(self, directories):
+	def loadSoundListFromDirs(self, directories, d):
 		# load sounds
 		self.sounds = []
 		for directory in directories:
-			self.loadSoundListFromDir(directory)
+			self.loadSoundListFromDir(d + "/" + directory)
 		if verbose:
 			print("LOADING " + str(len(self.sounds)) + " in channel " + self.alias)
 		if len(self.sounds) == 0:
-			self.sounds.append("data/default.mp3")
+			self.sounds.append(d + "/" + self.debugSound)
 
 	def loadSoundListFromDir(self, directory):
 		if isdir(directory):
@@ -85,14 +85,19 @@ class ButtonPlayer(Button):
 		return self.player and self.player.get_state() in [vlc.State.Playing, vlc.State.Opening]
 
 	def getNewSound(self):
-		return random.choice(self.sounds)
+		if self.board.isDebugMode():
+			print ("en mode debug")
+			return self.debugSound
+		else:
+			print ("en mode normal")
+			return random.choice(self.sounds)
 	
 	def setVolume(self, v):
 		if verbose:
 			print("SETVOLUME (" + str(v) + ") on channel " + str(self.alias))
 		if self.playing():
 			self.player.audio_set_volume(v)
-	
+		
 	def stop(self):
 		if self.player:
 			if verbose:
@@ -132,26 +137,31 @@ class ButtonPlayer(Button):
 class ButtonMainControl(Button):
 	def __init__(self, channel, board):
 		Button.__init__(self, channel, board)
+		self.durationShortPress = 3
 
 	def shortPress(self):
 		self.board.stopAllSounds()
 		
 	def longPress(self):
-		# TODO: another action?
-		self.board.stopAllSounds()
+		self.board.toggleDebugMode()
 
 		
 class Board:
 	def __init__(self):
 		self.buttons = []
 		self.autoVolumes = False
+		self.debugMode = False
+		self.directory = ""
 		GPIO.setmode(GPIO.BOARD)
+		
+	def setDirectory(self, d):
+		self.directory = d
 		
 	def addButtonMainControl(self, channel):
 		self.mainControl = ButtonMainControl(channel, self)
 		
 	def addButton(self, channel, alias, directories):
-		self.buttons.append(ButtonPlayer(channel, alias, directories, self))
+		self.buttons.append(ButtonPlayer(channel, alias, directories, self.directory, self))
 		
 	def stopAllSounds(self):
 		for button in self.buttons:
@@ -177,6 +187,19 @@ class Board:
 			for b in self.buttons:
 				if b.playing():
 					b.setVolume(volume)
+
+	def isDebugMode(self):
+		return self.debugMode
+	
+	def setDebugMode(self, status = True):
+		self.debugMode = status
+		
+	def toggleDebugMode(self):		
+		self.debugMode = not self.debugMode
+		if self.debugMode:
+			print("DEBUG MODE ON")
+		else:
+			print("DEBUG MODE OFF")
 
 	def run(self):
 		
