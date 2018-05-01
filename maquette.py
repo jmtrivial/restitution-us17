@@ -14,10 +14,10 @@ board.setDirectory(os.path.dirname(os.path.realpath(__file__)))
 
 buttons = {}
 buttons[3] = "cachot"
-buttons[5] = "cour-canapes"
+buttons[5] = "cour-loge"
 buttons[7] = "tour"
 buttons[8] = "cour-bar"
-buttons[10] = "cour-loge"
+buttons[10] = "cour-canapes"
 buttons[11] = "cour-animaux"
 buttons[12] = "cuisine"
 buttons[13] = "lac"

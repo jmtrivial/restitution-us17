@@ -21,10 +21,13 @@ class Button:
 		self.board = board
 		self.state = False
 		self.durationShortPress = 0.5
+		self.durationBetweenPresses = 0.001
+		self.lastAction = currentTimestamp()
+		self.clicSounds = ["data/clic.mp3", "data/clic2.mp3"]
 		if verbose: 
 			print("Register button on channel " + str(self.channel))
 		GPIO.setup(self.channel, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-		GPIO.add_event_detect(self.channel, GPIO.BOTH, callback=self.stateChanged)
+		GPIO.add_event_detect(self.channel, GPIO.BOTH, callback=self.stateChanged) #, bouncetime=1
 
 	def stateChanged(self, channel):
 		if GPIO.input(self.channel):
@@ -36,18 +39,24 @@ class Button:
 				self.state = True
 				return self.falling()
 
-
+	def playClic(self, nb = 0):
+		player = vlc.MediaPlayer(self.board.directory + "/" + self.clicSounds[nb])
+		player.play()
+	
 	def rising(self):
 		if verbose:
 			print("Rising on channel"  + str(self.channel))
 		timestamp2 = currentTimestamp()
-		if timestamp2 - self.timestamp < self.durationShortPress:
+		if timestamp2 - self.timestamp < self.durationShortPress and timestamp2 - self.lastAction > self.durationBetweenPresses:
+			self.lastAction = timestamp2
 			self.shortPress()
 
 	def afterShortPress(self, initialTimestamp):
-		if self.state == True and self.timestamp == initialTimestamp:
+		timestamp2 = currentTimestamp()
+		if self.state == True and self.timestamp == initialTimestamp and timestamp2 - self.lastAction > self.durationBetweenPresses:
 			if verbose:
 				print("LONG PRESS detected on channel" + str(self.channel))
+			self.lastAction = timestamp2
 			self.longPress()
 
 	def falling(self):
@@ -60,22 +69,23 @@ class Button:
 class ButtonPlayer(Button):
 	debugSound = "data/default.mp3"
 	
-	def __init__(self, channel, alias, directories, directory, board):
+	def __init__(self, channel, alias, directories, board):
 		Button.__init__(self, channel, board)
 		self.player = None
 		self.alias = alias
 		
-		self.loadSoundListFromDirs(directories, directory)
-		
-	def loadSoundListFromDirs(self, directories, d):
+		self.loadSoundListFromDirs(directories)
+	
+
+	def loadSoundListFromDirs(self, directories):
 		# load sounds
 		self.sounds = []
 		for directory in directories:
-			self.loadSoundListFromDir(d + "/" + directory)
+			self.loadSoundListFromDir(self.board.directory + "/" + directory)
 		if verbose:
 			print("LOADING " + str(len(self.sounds)) + " in channel " + self.alias)
 		if len(self.sounds) == 0:
-			self.sounds.append(d + "/" + self.debugSound)
+			self.sounds.append(self.board.directory + "/" + self.debugSound)
 
 	def loadSoundListFromDir(self, directory):
 		if isdir(directory):
@@ -127,9 +137,11 @@ class ButtonPlayer(Button):
 		self.board.adjustVolumes()
 
 	def shortPress(self):
+		self.playClic(0)
 		self.playNewSound()
 		
 	def longPress(self):
+		self.playClic(1)
 		self.stop()
 	
 
@@ -140,9 +152,11 @@ class ButtonMainControl(Button):
 		self.durationShortPress = 3
 
 	def shortPress(self):
+		self.playClic(1)
 		self.board.stopAllSounds()
 		
 	def longPress(self):
+		self.playClic(1)
 		self.board.toggleDebugMode()
 
 		
@@ -161,7 +175,7 @@ class Board:
 		self.mainControl = ButtonMainControl(channel, self)
 		
 	def addButton(self, channel, alias, directories):
-		self.buttons.append(ButtonPlayer(channel, alias, directories, self.directory, self))
+		self.buttons.append(ButtonPlayer(channel, alias, directories, self))
 		
 	def stopAllSounds(self):
 		for button in self.buttons:

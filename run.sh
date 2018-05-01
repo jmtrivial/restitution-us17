@@ -7,6 +7,7 @@ if [ ! `screen -list|grep maquette|wc -l` -eq 0 ]; then
 	screen -S "maquette" -X quit
 fi
 
+echo "START AUDIO"
 screen -S "maquette" -d -m $DIR/maquette.py
 
 
