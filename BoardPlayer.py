@@ -217,6 +217,10 @@ class Board:
 
 	def run(self):
 		
+		
+		player = vlc.MediaPlayer(self.directory + "/data/startup.mp3")
+		player.play()
+		
 		self.loop = asyncio.get_event_loop()
 		self.loop.set_debug(True)
 		self.loop.run_forever()
