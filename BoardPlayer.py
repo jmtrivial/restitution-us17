@@ -22,6 +22,7 @@ class Button:
 		self.state = False
 		self.durationShortPress = 0.5
 		self.durationBetweenPresses = 0.001
+		self.player_button = vlc.MediaPlayer()
 		self.lastAction = currentTimestamp()
 		self.clicSounds = ["data/clic.mp3", "data/clic2.mp3"]
 		if verbose: 
@@ -40,8 +41,11 @@ class Button:
 				return self.falling()
 
 	def playClic(self, nb = 0):
-		player = vlc.MediaPlayer(self.board.directory + "/" + self.clicSounds[nb])
-		player.play()
+		if self.player_button and self.player_button.is_playing():
+			self.player_button.stop()
+		self.media_button = self.board.vlc_instance.media_new(self.board.directory + "/" + self.clicSounds[nb])
+		self.player_button.set_media(self.media_button)
+		self.player_button.play()
 	
 	def rising(self):
 		if verbose:
@@ -71,7 +75,9 @@ class ButtonPlayer(Button):
 	
 	def __init__(self, channel, alias, directories, board):
 		Button.__init__(self, channel, board)
-		self.player = None
+		#self.player = self.board.vlc_instance.media_player_new()
+		self.player = vlc.MediaPlayer()
+		self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.soundFinished, 1)
 		self.alias = alias
 		
 		self.loadSoundListFromDirs(directories)
@@ -113,8 +119,6 @@ class ButtonPlayer(Button):
 			if verbose:
 				print("STOP on channel " + str(self.alias))
 			self.player.stop()
-			self.player.release()
-			self.player = None
 			self.board.adjustVolumes()
 		pass
 		
@@ -128,11 +132,10 @@ class ButtonPlayer(Button):
 	def playNewSound(self):
 		if verbose:
 			print("PLAY on channel " + str(self.alias))
-		if self.player:
+		if self.player and self.player.is_playing():
 			self.player.stop()
-			self.player.release()
-		self.player = vlc.MediaPlayer(self.getNewSound())
-		self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.soundFinished, 1)
+		self.media = self.board.vlc_instance.media_new(self.getNewSound())
+		self.player.set_media(self.media)
 		self.player.play()
 		self.board.adjustVolumes()
 
@@ -167,6 +170,8 @@ class Board:
 		self.debugMode = False
 		self.directory = ""
 		GPIO.setmode(GPIO.BOARD)
+		self.vlc_instance = vlc.Instance()
+
 		
 	def setDirectory(self, d):
 		self.directory = d
@@ -217,8 +222,9 @@ class Board:
 
 	def run(self):
 		
-		
-		player = vlc.MediaPlayer(self.directory + "/data/startup.mp3")
+		player = vlc.MediaPlayer()
+		media = self.vlc_instance.media_new(self.directory + "/data/startup.mp3")
+		player.set_media(media)
 		player.play()
 		
 		self.loop = asyncio.get_event_loop()
