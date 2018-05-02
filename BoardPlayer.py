@@ -22,8 +22,10 @@ class Button:
 		self.state = False
 		self.durationShortPress = 0.5
 		self.durationBetweenPresses = 0.001
-		self.player_button = vlc.MediaPlayer()
+		self.vlc_instance_button = board.vlc_instance
+		self.player_button = self.vlc_instance_button.media_player_new()
 		self.lastAction = currentTimestamp()
+		self.lastLong = currentTimestamp()
 		self.clicSounds = ["data/clic.mp3", "data/clic2.mp3"]
 		if verbose: 
 			print("Register button on channel " + str(self.channel))
@@ -43,7 +45,7 @@ class Button:
 	def playClic(self, nb = 0):
 		if self.player_button and self.player_button.is_playing():
 			self.player_button.stop()
-		self.media_button = self.board.vlc_instance.media_new(self.board.directory + "/" + self.clicSounds[nb])
+		self.media_button = self.vlc_instance_button.media_new(self.board.directory + "/" + self.clicSounds[nb])
 		self.player_button.set_media(self.media_button)
 		self.player_button.play()
 	
@@ -51,7 +53,7 @@ class Button:
 		if verbose:
 			print("Rising on channel"  + str(self.channel))
 		timestamp2 = currentTimestamp()
-		if timestamp2 - self.timestamp < self.durationShortPress and timestamp2 - self.lastAction > self.durationBetweenPresses:
+		if timestamp2 - self.timestamp < self.durationShortPress and timestamp2 - self.lastAction > self.durationBetweenPresses and self.lastLong != self.timestamp:
 			self.lastAction = timestamp2
 			self.shortPress()
 
@@ -61,6 +63,7 @@ class Button:
 			if verbose:
 				print("LONG PRESS detected on channel" + str(self.channel))
 			self.lastAction = timestamp2
+			self.lastLong = self.timestamp
 			self.longPress()
 
 	def falling(self):
@@ -75,8 +78,8 @@ class ButtonPlayer(Button):
 	
 	def __init__(self, channel, alias, directories, board):
 		Button.__init__(self, channel, board)
-		#self.player = self.board.vlc_instance.media_player_new()
-		self.player = vlc.MediaPlayer()
+		self.vlc_instance = board.vlc_instance
+		self.player = self.vlc_instance.media_player_new()
 		self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.soundFinished, 1)
 		self.alias = alias
 		
@@ -134,7 +137,7 @@ class ButtonPlayer(Button):
 			print("PLAY on channel " + str(self.alias))
 		if self.player and self.player.is_playing():
 			self.player.stop()
-		self.media = self.board.vlc_instance.media_new(self.getNewSound())
+		self.media = self.vlc_instance.media_new(self.getNewSound())
 		self.player.set_media(self.media)
 		self.player.play()
 		self.board.adjustVolumes()
@@ -171,6 +174,7 @@ class Board:
 		self.directory = ""
 		GPIO.setmode(GPIO.BOARD)
 		self.vlc_instance = vlc.Instance()
+		self.player = self.vlc_instance.media_player_new()
 
 		
 	def setDirectory(self, d):
@@ -222,10 +226,9 @@ class Board:
 
 	def run(self):
 		
-		player = vlc.MediaPlayer()
 		media = self.vlc_instance.media_new(self.directory + "/data/startup.mp3")
-		player.set_media(media)
-		player.play()
+		self.player.set_media(media)
+		self.player.play()
 		
 		self.loop = asyncio.get_event_loop()
 		self.loop.set_debug(True)
