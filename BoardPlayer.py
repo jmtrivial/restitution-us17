@@ -56,15 +56,21 @@ class Button:
 		if timestamp2 - self.timestamp < self.durationShortPress and timestamp2 - self.lastAction > self.durationBetweenPresses and self.lastLong != self.timestamp:
 			self.lastAction = timestamp2
 			self.shortPress()
+		else:
+			if timestamp2 - self.timestamp > self.durationShortPress and self.lastLong < timestamp2 and self.lastLong != self.timestamp:
+				self.lastAction = timestamp2
+				self.lastLong = self.timestamp
+				self.longPress()
 
 	def afterShortPress(self, initialTimestamp):
 		timestamp2 = currentTimestamp()
-		if self.state == True and self.timestamp == initialTimestamp and timestamp2 - self.lastAction > self.durationBetweenPresses:
-			if verbose:
-				print("LONG PRESS detected on channel" + str(self.channel))
-			self.lastAction = timestamp2
-			self.lastLong = self.timestamp
-			self.longPress()
+		if self.lastLong != self.timestamp:
+			if self.state == True and self.timestamp == initialTimestamp and timestamp2 - self.lastAction > self.durationBetweenPresses:
+				if verbose:
+					print("LONG PRESS detected on channel" + str(self.channel))
+				self.lastAction = timestamp2
+				self.lastLong = self.timestamp
+				self.longPress()
 
 	def falling(self):
 		self.timestamp = currentTimestamp()
@@ -76,10 +82,11 @@ class Button:
 class ButtonPlayer(Button):
 	debugSound = "data/default.mp3"
 	
-	def __init__(self, channel, alias, directories, board):
+	def __init__(self, channel, alias, group, directories, board):
 		Button.__init__(self, channel, board)
 		self.vlc_instance = board.vlc_instance
 		self.player = self.vlc_instance.media_player_new()
+		self.group = group
 		self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.soundFinished, 1)
 		self.alias = alias
 		
@@ -133,6 +140,7 @@ class ButtonPlayer(Button):
 		
 	
 	def playNewSound(self):
+		self.board.stopSameGroup(self.group)
 		if verbose:
 			print("PLAY on channel " + str(self.alias))
 		if self.player and self.player.is_playing():
@@ -171,6 +179,7 @@ class Board:
 		self.buttons = []
 		self.autoVolumes = False
 		self.debugMode = False
+		self.use_groups = True
 		self.directory = ""
 		GPIO.setmode(GPIO.BOARD)
 		self.vlc_instance = vlc.Instance()
@@ -183,8 +192,15 @@ class Board:
 	def addButtonMainControl(self, channel):
 		self.mainControl = ButtonMainControl(channel, self)
 		
-	def addButton(self, channel, alias, directories):
-		self.buttons.append(ButtonPlayer(channel, alias, directories, self))
+	def addButton(self, channel, alias, group, directories):
+		self.buttons.append(ButtonPlayer(channel, alias, group, directories, self))
+
+	def stopSameGroup(self, group):
+		if self.use_groups:
+			for button in self.buttons:
+				if button.group == group:
+					button.stop()
+
 		
 	def stopAllSounds(self):
 		for button in self.buttons:
