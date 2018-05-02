@@ -125,7 +125,7 @@ class ButtonPlayer(Button):
 			self.player.audio_set_volume(v)
 		
 	def stop(self):
-		if self.player:
+		if self.player and self.player.is_playing():
 			if verbose:
 				print("STOP on channel " + str(self.alias))
 			self.player.stop()
@@ -140,7 +140,7 @@ class ButtonPlayer(Button):
 		
 	
 	def playNewSound(self):
-		self.board.stopSameGroup(self.group)
+		self.board.stopBeforePlaying(self.group)
 		if verbose:
 			print("PLAY on channel " + str(self.alias))
 		if self.player and self.player.is_playing():
@@ -170,8 +170,7 @@ class ButtonMainControl(Button):
 		self.board.stopAllSounds()
 		
 	def longPress(self):
-		self.playClic(1)
-		self.board.toggleDebugMode()
+		self.board.nextMode()
 
 		
 class Board:
@@ -179,13 +178,33 @@ class Board:
 		self.buttons = []
 		self.autoVolumes = False
 		self.debugMode = False
-		self.use_groups = True
+		self.use_groups = False
+		self.use_single_track = True
 		self.directory = ""
 		GPIO.setmode(GPIO.BOARD)
 		self.vlc_instance = vlc.Instance()
 		self.player = self.vlc_instance.media_player_new()
 
-		
+  
+	def nextMode(self):
+		self.stopAllSounds()
+		if self.use_single_track:
+			self.use_single_track = False
+			self.use_groups = True
+			print("GROUP MODE")
+			self.play(self.directory + "/data/group-mode.mp3")
+		else:
+			if self.use_groups:
+				self.use_groups = False
+				self.use_single_track = False
+				print("FULL MODE")
+				self.play(self.directory + "/data/full-mode.mp3")
+			else:
+				self.use_groups = False
+				self.use_single_track = True
+				print("SINGLE MODE")
+				self.play(self.directory + "/data/single-mode.mp3")
+
 	def setDirectory(self, d):
 		self.directory = d
 		
@@ -195,11 +214,15 @@ class Board:
 	def addButton(self, channel, alias, group, directories):
 		self.buttons.append(ButtonPlayer(channel, alias, group, directories, self))
 
-	def stopSameGroup(self, group):
-		if self.use_groups:
+	def stopBeforePlaying(self, group):
+		if self.use_single_track:
 			for button in self.buttons:
-				if button.group == group:
 					button.stop()
+		else:
+			if self.use_groups:
+				for button in self.buttons:
+					if button.group == group:
+						button.stop()
 
 		
 	def stopAllSounds(self):
@@ -240,11 +263,14 @@ class Board:
 		else:
 			print("DEBUG MODE OFF")
 
-	def run(self):
-		
-		media = self.vlc_instance.media_new(self.directory + "/data/startup.mp3")
+	def play(self, filename):
+		media = self.vlc_instance.media_new(filename)
 		self.player.set_media(media)
 		self.player.play()
+
+	def run(self):
+		
+		self.play(self.directory + "/data/startup.mp3")
 		
 		self.loop = asyncio.get_event_loop()
 		self.loop.set_debug(True)
