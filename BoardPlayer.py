@@ -135,7 +135,6 @@ class ButtonPlayer(Button):
 	def soundFinished(self, data, media):
 		if verbose:
 			print("ENDOFSOUND on channel " + str(self.alias))
-		self.player = None
 		self.board.adjustVolumes()
 		
 	
