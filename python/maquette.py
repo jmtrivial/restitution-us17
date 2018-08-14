@@ -10,7 +10,7 @@ board = Board()
 
 board.addButtonMainControl(19)
 
-board.setDirectory(os.path.dirname(os.path.realpath(__file__)))
+board.setDirectory(os.path.dirname(os.path.realpath(__file__)) + "/..")
 
 buttons = {}
 buttons[3] = ["cachot", "jaune"]
