@@ -5,6 +5,12 @@
 
 #include <wiringPi.h>
 
+int debugLevel = 5;
+
+void debugMessage(const QString & msg, int dbLevel = 5) {
+    if (dbLevel <= debugLevel)
+        std::cout << msg.toStdString() << std::endl;
+}
 
 
 
@@ -13,11 +19,48 @@ Board * Board::myInstance = 0;
 QStringList Button::clicSounds = {"data/clic.mp3", "data/clic2.mp3"};
 QString Button::debugSound = "data/default.mp3";
 
-int Button::durationShortPress = 500;
-int Button::durationBetweenPresses = 100;
+int Button::durationShortPress = 1000;
+int Button::durationBetweenPresses = 50;
+int Button::minimalDurationPress = 1;
 
 void Board::setDirectory(const QString &value) {
     directory = value;
+}
+
+Board::modes Board::nextMode() {
+    switch(currentMode) {
+    case singleMode:
+        debugMessage("GROUP MODE");
+        currentMode = groupMode;
+        break;
+    case groupMode:
+        debugMessage("FULL MODE");
+        currentMode = fullMode;
+        break;
+    case fullMode:
+        debugMessage("SINGLE MODE");
+        currentMode = singleMode;
+        break;
+    }
+    return currentMode;
+}
+
+QString Board::modeToSound(Board::modes m) {
+    switch(m) {
+    case singleMode:
+        return getDirectory() + "/data/single-mode.mp3";
+    case groupMode:
+        return getDirectory() + "/data/group-mode.mp3";
+    case fullMode:
+        return getDirectory() + "/data/full-mode.mp3";
+    }
+}
+
+void Board::stopAllSounds() {
+    debugMessage("Stop all sounds");
+    for(auto b: pButtons) {
+        b->stop();
+    }
 }
 
 Button &Board::getButton(int channel) {
@@ -29,11 +72,24 @@ Button &Board::getButton(int channel) {
         abort();
 }
 
+void Board::stopBeforePlaying(const QString &group, const QString & alias) {
+    if (currentMode == singleMode) {
+        for(auto b: pButtons)
+            if (alias != b->getAlias())
+                b->stop();
+    }
+    else if (currentMode == groupMode) {
+        for(auto b: pButtons)
+            if (b->getGroup() == group && b->getAlias() != alias)
+                b->stop();
+    }
+}
+
 void Board::helpMessage() {
-    printf("Usage: \n");
-    printf("maquette [DIR]\n\n");
-    printf("Parameter: \n");
-    printf("  DIR     A directory that contains a \"data\" directory\n");
+    std::cout << "Usage: \n" << std::endl;
+    std::cout << "maquette [DIR]" << std::endl << std::endl;
+    std::cout << "Parameter:" << std::endl;
+    std::cout << "  DIR     A directory that contains a \"data\" directory" << std::endl;
     stop = true;
 }
 
@@ -42,12 +98,12 @@ void Board::initGPIO() {
 }
 Board::Board(int argc, char *argv[]) : QCoreApplication(argc, argv) {
     stop = false;
+    currentMode = fullMode;
     switch(argc) {
     case 1:
         setDirectory(applicationDirPath());
         break;
     case 2:
-        printf("1 param");
         if (QString(argv[1]) == "--help") {
             helpMessage();
         }
@@ -132,31 +188,32 @@ void Board::addInterruptionsHandler(int channel) {
 }
 
 void Board::interruption0() {
+    // use invokeMethod to make the call from the main thread
     if (digitalRead(0) == 1)
-        emit Board::instance().getButton(0).rising();
+      QMetaObject::invokeMethod(&Board::instance().getButton(0), "rising");
     else
-        emit Board::instance().getButton(0).falling();
+      QMetaObject::invokeMethod(&Board::instance().getButton(0), "falling");
 }
-void Board::interruption1() { if (digitalRead(1) == 1) emit Board::instance().getButton(1).rising(); else emit Board::instance().getButton(1).falling();}
-void Board::interruption2() { if (digitalRead(2) == 1) emit Board::instance().getButton(2).rising(); else emit Board::instance().getButton(2).falling();}
-void Board::interruption3() { if (digitalRead(3) == 1) emit Board::instance().getButton(3).rising(); else emit Board::instance().getButton(3).falling();}
-void Board::interruption4() { if (digitalRead(4) == 1) emit Board::instance().getButton(4).rising(); else emit Board::instance().getButton(4).falling();}
-void Board::interruption5() { if (digitalRead(5) == 1) emit Board::instance().getButton(5).rising(); else emit Board::instance().getButton(5).falling();}
-void Board::interruption6() { if (digitalRead(6) == 1) emit Board::instance().getButton(6).rising(); else emit Board::instance().getButton(6).falling();}
-void Board::interruption7() { if (digitalRead(7) == 1) emit Board::instance().getButton(7).rising(); else emit Board::instance().getButton(7).falling();}
-void Board::interruption8() { if (digitalRead(8) == 1) emit Board::instance().getButton(8).rising(); else emit Board::instance().getButton(8).falling();}
-void Board::interruption9() { if (digitalRead(9) == 1) emit Board::instance().getButton(9).rising(); else emit Board::instance().getButton(9).falling();}
-void Board::interruption10() { if (digitalRead(10) == 1) emit Board::instance().getButton(10).rising(); else emit Board::instance().getButton(10).falling();}
-void Board::interruption11() { if (digitalRead(11) == 1) emit Board::instance().getButton(11).rising(); else emit Board::instance().getButton(11).falling();}
-void Board::interruption12() { if (digitalRead(12) == 1) emit Board::instance().getButton(12).rising(); else emit Board::instance().getButton(12).falling();}
-void Board::interruption13() { if (digitalRead(13) == 1) emit Board::instance().getButton(13).rising(); else emit Board::instance().getButton(13).falling();}
-void Board::interruption14() { if (digitalRead(14) == 1) emit Board::instance().getButton(14).rising(); else emit Board::instance().getButton(14).falling();}
-void Board::interruption15() { if (digitalRead(15) == 1) emit Board::instance().getButton(15).rising(); else emit Board::instance().getButton(15).falling();}
-void Board::interruption16() { if (digitalRead(16) == 1) emit Board::instance().getButton(16).rising(); else emit Board::instance().getButton(16).falling();}
-void Board::interruption17() { if (digitalRead(17) == 1) emit Board::instance().getButton(17).rising(); else emit Board::instance().getButton(17).falling();}
-void Board::interruption18() { if (digitalRead(18) == 1) emit Board::instance().getButton(18).rising(); else emit Board::instance().getButton(18).falling();}
-void Board::interruption19() { if (digitalRead(19) == 1) emit Board::instance().getButton(19).rising(); else emit Board::instance().getButton(19).falling();}
-void Board::interruption20() { if (digitalRead(20) == 1) emit Board::instance().getButton(20).rising(); else emit Board::instance().getButton(20).falling();}
+void Board::interruption1() { if (digitalRead(1) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(1), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(1), "falling"); }
+void Board::interruption2() { if (digitalRead(2) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(2), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(2), "falling"); }
+void Board::interruption3() { if (digitalRead(3) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(3), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(3), "falling"); }
+void Board::interruption4() { if (digitalRead(4) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(4), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(4), "falling"); }
+void Board::interruption5() { if (digitalRead(5) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(5), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(5), "falling"); }
+void Board::interruption6() { if (digitalRead(6) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(6), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(6), "falling"); }
+void Board::interruption7() { if (digitalRead(7) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(7), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(7), "falling"); }
+void Board::interruption8() { if (digitalRead(8) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(8), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(8), "falling"); }
+void Board::interruption9() { if (digitalRead(9) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(9), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(9), "falling"); }
+void Board::interruption10() { if (digitalRead(10) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(10), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(10), "falling"); }
+void Board::interruption11() { if (digitalRead(11) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(11), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(11), "falling"); }
+void Board::interruption12() { if (digitalRead(12) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(12), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(12), "falling"); }
+void Board::interruption13() { if (digitalRead(13) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(13), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(13), "falling"); }
+void Board::interruption14() { if (digitalRead(14) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(14), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(14), "falling"); }
+void Board::interruption15() { if (digitalRead(15) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(15), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(15), "falling"); }
+void Board::interruption16() { if (digitalRead(16) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(16), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(16), "falling"); }
+void Board::interruption17() { if (digitalRead(17) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(17), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(17), "falling"); }
+void Board::interruption18() { if (digitalRead(18) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(18), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(18), "falling"); }
+void Board::interruption19() { if (digitalRead(19) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(19), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(19), "falling"); }
+void Board::interruption20() { if (digitalRead(20) == 1) QMetaObject::invokeMethod(&Board::instance().getButton(20), "rising"); else QMetaObject::invokeMethod(&Board::instance().getButton(20), "falling"); }
 
 
 
@@ -197,26 +254,45 @@ ButtonMainControl::~ButtonMainControl() {
 }
 
 void ButtonMainControl::shortPress() {
-    printf(" short press control\n");
-    // TODO
+    debugMessage(" short press control", 10);
+    board.stopAllSounds();
+    playClic(1);
 }
 
 void ButtonMainControl::longPress() {
-    printf(" long press control\n");
-    // TODO
+    debugMessage(" long press control", 10);
+    board.stopAllSounds();
+    playClic(1);
+    auto m = board.nextMode();
+    play(board.modeToSound(m), true);
 }
 
-void ButtonPlayer::loadSoundListFromDir(QString & directory) {
-    QDirIterator it(directory, QStringList() << "*.mp3", QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext())
+QString ButtonPlayer::getGroup() const {
+    return group;
+}
+
+
+QString ButtonPlayer::getAlias() const {
+    return alias;
+}
+
+void ButtonPlayer::loadSoundListFromDir(const QString & directory) {
+    QDirIterator it(directory, QStringList() << "*.mp3" << "*.MP3" << "*.wav" << "*.WAV", QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
         sounds << it.next();
+    }
 }
 
-void ButtonPlayer::loadSoundListFromDirs(QStringList & directories) {
+void ButtonPlayer::loadSoundListFromDirs(const QStringList & directories) {
     for(auto d: directories)
-        loadSoundListFromDir(d);
+        loadSoundListFromDir(board.getDirectory() + "/" + d);
     if (sounds.empty())
         sounds.push_back(board.getDirectory() + "/" + debugSound);
+}
+
+void ButtonPlayer::playNewSound() {
+    board.stopBeforePlaying(group, alias);
+    play(sounds[qrand() % sounds.size()], false);
 }
 
 ButtonPlayer::ButtonPlayer(Board &board, int channel, QString alias,
@@ -231,17 +307,20 @@ ButtonPlayer::~ButtonPlayer() {
 }
 
 void ButtonPlayer::shortPress() {
-    printf(" short press\n");
-    // TODO
+    debugMessage(" short press", 10);
+    playClic(0);
+    playNewSound();
 }
 
 void ButtonPlayer::longPress() {
-    printf(" long press\n");
-    // TODO
+    debugMessage(" long press", 10);
+    stop();
+    playClic(1);
 }
 
 void Button::initPlayer() {
-    // TODO
+    connect(&player, SIGNAL(mediaStatusChanged(QMediaPlayer::MediaStatus)),
+            this, SLOT(changedStatusPlayer(QMediaPlayer::MediaStatus)));
 }
 
 void Button::initGPIO() {
@@ -251,53 +330,79 @@ void Button::initGPIO() {
 
 
 
-void Button::play(QString &filename) {
-    // TODO
+void Button::play(const QString &filename, bool replace) {
+    if (replace) {
+        debugMessage("Playing " + filename + " on button " + QString::number(channel));
+        player.setMedia(QUrl::fromLocalFile(filename));
+        player.play();
+    }
+    else {
+        debugMessage("Add " + filename + " to the queue on button " + QString::number(channel));
+        nextSound = filename;
+    }
+
+}
+
+void Button::stop() {
+    debugMessage("Stop on button " + QString::number(channel));
+    player.stop();
 }
 
 void Button::rising() {
     if (state) {
-        state = false;
-        printf((QString("Rising ") + QString::number(channel) + QString("\n")).toLatin1());
         QDateTime now = QDateTime::currentDateTime();
-        if (press.msecsTo(now) < durationShortPress && lastAction.msecsTo(now) > durationBetweenPresses) {
-            lastAction = now;
-            shortPress();
-        }
-        else if (press.msecsTo(now) >= durationShortPress && lastLong < now && lastLong != press) {
-            lastAction = now;
-            lastLong = press;
-            longPress();
+        state = false;
+        if (press.msecsTo(now) > minimalDurationPress) {
+            if (lastAction.msecsTo(now) > durationBetweenPresses) {
+                lastAction = now;
+                debugMessage(QString("Rising ") + QString::number(channel), 15);
+                if (press.msecsTo(now) < durationShortPress) {
+                    shortPress();
+                }
+                else if (press.msecsTo(now) >= durationShortPress && lastLong < now && lastLong != press) {
+                    lastLong = press;
+                    longPress();
+                }
+            }
         }
     }
 }
 
 void Button::waitLongPress(QDateTime initialPress) {
-    connect(&timer, &QTimer::timeout, [=]() {
-         afterShortPress(initialPress);
-    });
     timer.start(Button::durationShortPress);
+}
+
+void Button::changedStatusPlayer(QMediaPlayer::MediaStatus status) {
+    if (nextSound != "") {
+        if (status == QMediaPlayer::EndOfMedia) {
+            QString ns = nextSound;
+            nextSound = "";
+            play(ns, true);
+        }
+    }
 }
 
 void Button::falling() {
     if (!state) {
         state = true;
-        printf((QString("Falling ") + QString::number(channel) + QString("\n")).toLatin1());
-        press = QDateTime::currentDateTime();
-        // use invokeMethod to make the call from the main thread
-        QMetaObject::invokeMethod(this, "waitLongPress", Q_ARG(QDateTime, press));
-
-
-
+        QDateTime now = QDateTime::currentDateTime();
+        if (press.msecsTo(now) > minimalDurationPress) {
+            debugMessage(QString("Falling ") + QString::number(channel), 15);
+            press = QDateTime::currentDateTime();
+            timer.start(Button::durationShortPress);
+        }
     }
 }
 
-void Button::afterShortPress(QDateTime starter) {
-    QDateTime now = QDateTime::currentDateTime();
-    if (press == starter && lastLong != press && state && lastAction.msecsTo(now) > durationBetweenPresses) {
-        lastAction = now;
-        lastLong = press;
-        longPress();
+void Button::afterShortPress() {
+    if (state) {
+        QDateTime now = QDateTime::currentDateTime();
+        if (lastLong != press && state && lastAction.msecsTo(now) > durationBetweenPresses) {
+            lastAction = now;
+            lastLong = press;
+            longPress();
+            state = false;
+        }
     }
 }
 
@@ -305,7 +410,10 @@ void Button::afterShortPress(QDateTime starter) {
 Button::Button(Board &board, int channel) : board(board), channel(channel),
     lastAction(QDateTime::currentDateTime()),
     lastLong(QDateTime::currentDateTime()),
+    press(QDateTime::currentDateTime()),
     state(false) {
+    timer.setSingleShot(true);
+    connect(&timer, &QTimer::timeout, [=]() { afterShortPress(); });
     initPlayer();
     initGPIO();
 }
@@ -313,8 +421,8 @@ Button::Button(Board &board, int channel) : board(board), channel(channel),
 
 void Button::playClic(int nb) {
     if (nb >= clicSounds.size())
-        play(clicSounds[0]);
+        play(board.getDirectory() + "/" + clicSounds[0], true);
     else
-        play(clicSounds[nb]);
+        play(board.getDirectory() + "/" + clicSounds[nb], true);
 }
 

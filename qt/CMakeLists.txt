@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.1.0)
 
 project(maquette)
 
-find_package(Qt5Core)
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Multimedia REQUIRED)
 
 
 
@@ -20,4 +21,4 @@ set(maquette_SRCS
 
 # Tell CMake to create the executable
 add_executable(maquette WIN32 ${maquette_SRCS})
-target_link_libraries(maquette Qt5::Core -lwiringPi)
+target_link_libraries(maquette Qt5::Core Qt5::Multimedia -lwiringPi)

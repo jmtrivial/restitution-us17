@@ -1,3 +1,4 @@
+﻿#include <QMediaPlayer>
 #include <QCoreApplication>
 #include <QSocketNotifier>
 #include <QFile>
@@ -8,7 +9,6 @@
 class Board;
 
 
-
 class Button : public QObject {
     Q_OBJECT
 protected:
@@ -17,21 +17,26 @@ protected:
     static QStringList clicSounds;
     static int durationShortPress;
     static int durationBetweenPresses;
+    static int minimalDurationPress;
     static QString debugSound;
+    QString nextSound;
     QDateTime press;
     QDateTime lastAction;
     QDateTime lastLong;
-    QStringList sounds;
     QTimer timer;
     bool state;
+
+    QMediaPlayer player;
 
     void initPlayer();
     void initGPIO();
 
-    void play(QString & filename);
+    void play(const QString &filename, bool replace = true);
+
+    void stop();
 
 
-
+    friend class Board;
 public:
 	Button(Board & board, int channel);
 
@@ -39,16 +44,16 @@ public:
 
     virtual void shortPress() = 0;
     virtual void longPress() = 0;
+    QStringList sounds;
 
-private slots:
-    void afterShortPress(QDateTime starter);
-    void waitLongPress(QDateTime initialPress);
-
-protected slots:
+public slots:
     void rising();
     void falling();
 
-    friend class Board;
+private slots:
+    void afterShortPress();
+    void waitLongPress(QDateTime initialPress);
+    void changedStatusPlayer(QMediaPlayer::MediaStatus status);
 };
 
 class ButtonPlayer : public Button {
@@ -56,13 +61,17 @@ private:
     QString alias;
     QString group;
 
-    void loadSoundListFromDir(QString &directory);
-    void loadSoundListFromDirs(QStringList & directories);
+    void loadSoundListFromDir(const QString &directory);
+    void loadSoundListFromDirs(const QStringList & directories);
+
+    void playNewSound();
 public:
     ButtonPlayer(Board & board, int channel, QString alias, QString group, QStringList directories);
     ~ButtonPlayer();
     void shortPress();
     void longPress();
+    QString getGroup() const;
+    QString getAlias() const;
 };
 
 class ButtonMainControl : public Button {
@@ -76,6 +85,9 @@ public:
 
 class Board : public QCoreApplication {
   private:
+    typedef enum { groupMode, fullMode, singleMode } modes;
+
+    modes currentMode;
     QMap<int, ButtonPlayer *> pButtons;
     QMap<int, ButtonMainControl *> mcButtons;
     QString directory;
@@ -130,5 +142,13 @@ class Board : public QCoreApplication {
   
     void setDirectory(const QString &value);
 
+    modes nextMode();
+
+    QString modeToSound(modes m);
+
+    void stopAllSounds();
+
     Button & getButton(int channel);
+
+    void stopBeforePlaying(const QString & group, const QString & alias);
 };
