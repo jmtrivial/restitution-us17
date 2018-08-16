@@ -12,7 +12,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    app.addButtonMainControl(19);
 
     QMap<int, QPair<QString, QString> > buttons;
     buttons[3] = QPair<QString, QString>("cachot", "jaune");
@@ -31,6 +30,8 @@ int main(int argc, char* argv[])
         app.addButtonPlayer(id, buttons.value(id).first, buttons.value(id).second,
         { "data/playlist-" + QString(id), "data/playlist-" + buttons.value(id).first});
     }
+
+    app.addButtonMainControl(19);
 
     return app.exec();
 }

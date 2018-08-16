@@ -19,9 +19,9 @@ Board * Board::myInstance = 0;
 QStringList Button::clicSounds = {"data/clic.mp3", "data/clic2.mp3"};
 QString Button::debugSound = "data/default.mp3";
 
-int Button::durationShortPress = 1000;
-int Button::durationBetweenPresses = 50;
-int Button::minimalDurationPress = 1;
+int Button::durationShortPress = 2000;
+int Button::durationBetweenPresses = 250;
+int Button::minimalStep = 5;
 
 void Board::setDirectory(const QString &value) {
     directory = value;
@@ -247,7 +247,7 @@ void Board::addButtonPlayer(int channel, QString alias, QString group, QStringLi
 }
 
 ButtonMainControl::ButtonMainControl(Board &board, int channel) : Button(board, channel){
-
+    playClic(1);
 }
 
 ButtonMainControl::~ButtonMainControl() {
@@ -298,8 +298,7 @@ void ButtonPlayer::playNewSound() {
 ButtonPlayer::ButtonPlayer(Board &board, int channel, QString alias,
                            QString group, QStringList directories) : Button(board, channel),
     alias(alias),
-    group(group)
-{
+    group(group) {
     loadSoundListFromDirs(directories);
 }
 
@@ -348,29 +347,49 @@ void Button::stop() {
     player.stop();
 }
 
+void Button::falling() {
+    QDateTime now = QDateTime::currentDateTime();
+    if (lastEdge.msecsTo(now) > minimalStep) { // if this falling appears significantly after a previous falling
+        state = true;
+        debugMessage(QString("Falling ") + QString::number(channel), 15);
+        press = QDateTime::currentDateTime();
+        timer.start(Button::durationShortPress); // restart the countdown for the long-press detection
+    }
+    lastEdge = now;
+}
+
 void Button::rising() {
     if (state) {
         QDateTime now = QDateTime::currentDateTime();
-        state = false;
-        if (press.msecsTo(now) > minimalDurationPress) {
-            if (lastAction.msecsTo(now) > durationBetweenPresses) {
-                lastAction = now;
+        if (lastEdge.msecsTo(now) > minimalStep) { // if this rising appears significantly after the last falling
+            if (lastAction.msecsTo(now) > durationBetweenPresses) { // if this rising appears significantly after a previous pressing
                 debugMessage(QString("Rising ") + QString::number(channel), 15);
-                if (press.msecsTo(now) < durationShortPress) {
+                if (press.msecsTo(now) < durationShortPress) { // if it is a short press
+                    timer.stop(); // cancel the long-press countdown
+                    lastAction = now;
+                    state = false;
                     shortPress();
                 }
-                else if (press.msecsTo(now) >= durationShortPress && lastLong < now && lastLong != press) {
-                    lastLong = press;
-                    longPress();
-                }
+                else afterShortPress(); // it may be a non detected long press
             }
+        }
+        lastEdge = now;
+    }
+}
+
+void Button::afterShortPress() {
+    if (state && !digitalRead(channel)) { // if the pin is down and the program still waiting for a rising
+        QDateTime now = QDateTime::currentDateTime();
+        if (lastLong != press && // avoid double long press
+                lastAction.msecsTo(now) > durationBetweenPresses) {  // insure the long press appears significantly after the previous pressing
+            lastAction = now;
+            lastLong = press;
+            longPress();
+            state = false;
         }
     }
 }
 
-void Button::waitLongPress(QDateTime initialPress) {
-    timer.start(Button::durationShortPress);
-}
 
 void Button::changedStatusPlayer(QMediaPlayer::MediaStatus status) {
     if (nextSound != "") {
@@ -382,35 +401,11 @@ void Button::changedStatusPlayer(QMediaPlayer::MediaStatus status) {
     }
 }
 
-void Button::falling() {
-    if (!state) {
-        state = true;
-        QDateTime now = QDateTime::currentDateTime();
-        if (press.msecsTo(now) > minimalDurationPress) {
-            debugMessage(QString("Falling ") + QString::number(channel), 15);
-            press = QDateTime::currentDateTime();
-            timer.start(Button::durationShortPress);
-        }
-    }
-}
-
-void Button::afterShortPress() {
-    if (state) {
-        QDateTime now = QDateTime::currentDateTime();
-        if (lastLong != press && state && lastAction.msecsTo(now) > durationBetweenPresses) {
-            lastAction = now;
-            lastLong = press;
-            longPress();
-            state = false;
-        }
-    }
-}
-
-
 Button::Button(Board &board, int channel) : board(board), channel(channel),
     lastAction(QDateTime::currentDateTime()),
     lastLong(QDateTime::currentDateTime()),
     press(QDateTime::currentDateTime()),
+    lastEdge(QDateTime::currentDateTime()),
     state(false) {
     timer.setSingleShot(true);
     connect(&timer, &QTimer::timeout, [=]() { afterShortPress(); });

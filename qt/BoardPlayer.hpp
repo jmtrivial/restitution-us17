@@ -17,10 +17,11 @@ protected:
     static QStringList clicSounds;
     static int durationShortPress;
     static int durationBetweenPresses;
-    static int minimalDurationPress;
+    static int minimalStep;
     static QString debugSound;
     QString nextSound;
     QDateTime press;
+    QDateTime lastEdge;
     QDateTime lastAction;
     QDateTime lastLong;
     QTimer timer;
@@ -52,7 +53,6 @@ public slots:
 
 private slots:
     void afterShortPress();
-    void waitLongPress(QDateTime initialPress);
     void changedStatusPlayer(QMediaPlayer::MediaStatus status);
 };
 
